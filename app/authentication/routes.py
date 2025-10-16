@@ -1,11 +1,11 @@
 # app/authentication/routes.py
 from fastapi import (
-    APIRouter,
-    Depends,
     HTTPException,
-    status,
+    APIRouter,
     Response,
     Request,
+    Depends,
+    status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Union
@@ -13,40 +13,40 @@ from typing import Union
 from app.database.connection import get_db
 from app.users.schemas import UserRegister
 from app.authentication.services import (
-    register_user,
-    login_user,
-    refresh_access_token,
-    logout_user,
     create_password_reset_link,
+    verify_email_with_code,
+    refresh_access_token,
     resetting_password,
     update_password,
-    verify_email_with_code,
+    register_user,
+    login_user,
+    logout_user,
 )
 from app.authentication.dependencies import (
-    get_current_user,
     get_refresh_token_user,
+    get_current_user,
 )
 from app.authentication.helpers import (
-    set_auth_cookies,
-    clear_auth_cookies,
     # set_auth_response_for_mobile,
-    ClientType,
+    clear_auth_cookies,
+    set_auth_cookies,
     get_client_type,
+    ClientType,
 )
 from app.users.models import User
 from app.authentication.schemas import (
-    TokenResponseAfterRegistrationWeb,
     TokenResponseAfterRegistrationMobile,
-    TokenResponseAfterLoginWeb,
+    TokenResponseAfterRegistrationWeb,
+    TokenResponseAfterRefreshMobile,
     TokenResponseAfterLoginMobile,
     TokenResponseAfterRefreshWeb,
-    TokenResponseAfterRefreshMobile,
+    TokenResponseAfterLoginWeb,
     AuthMessageResponse,
-    UserLogin,
     ForgotPassword,
-    ResetPassword,
     ChangePassword,
+    ResetPassword,
     VerifyEmail,
+    UserLogin,
 )
 from app.core.config import settings
 
