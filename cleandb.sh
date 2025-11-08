@@ -3,8 +3,8 @@
 # Exit immediately if a command exits with a non-zero status.
 set -euo pipefail
 
-DB_USER=${DB_USER:-mac}
-DB_NAME=${DB_NAME:-mytestdb}
+DB_USER=${DB_USER:-myprojectdbuser}
+DB_NAME=${DB_NAME:-myprojectdb}
 
 echo "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo "STARTING CLEANUP PROCESS FOR '$DB_NAME' DATABASE!!!..."
@@ -41,23 +41,38 @@ echo "Creating database: $DB_NAME for user: $DB_USER..."
 echo "========================================================\n"
 psql -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
 
+
+# # Setting the owner of the public schema to the specified user.
+# echo "\n========================================================"
+# echo "Setting the owner of the public schema to user: $DB_USER..."
+# echo "========================================================\n"
+# psql -U "$DB_USER" -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO $DB_USER;"
+
+# # Grant all privileges on the public schema
+# echo "\n========================================================"
+# echo "Granting schema privileges to user: $DB_USER..."
+# echo "========================================================\n"
+# psql -U "$DB_USER" -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO $DB_USER;"
+# psql -U "$DB_USER" -d "$DB_NAME" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO $DB_USER;"
+# psql -U "$DB_USER" -d "$DB_NAME" -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;"
+
 # Removing old Alembic migration files (except __init__.py)
 echo "\n========================================================"
 echo "Removing old Alembic migration files..."
 echo "========================================================\n"
 find alembic/versions -type f -name "*.py" ! -name "__init__.py" -delete || true
 
-# # Cleaning the cache from alembic
-# echo "\n========================================================"
-# echo "Cleaning the cache from alembic..."
-# echo "========================================================\n"
-# find alembic -type d -name "__pycache__" -exec rm -rf {} +
+# Cleaning the cache from alembic
+echo "\n========================================================"
+echo "Cleaning the cache from alembic..."
+echo "========================================================\n"
+find alembic -type d -name "__pycache__" -exec rm -rf {} +
 
-# # Cleaning the cache of the entire project
-# echo "\n========================================================"
-# echo "Cleaning the cache of the entire project..."
-# echo "========================================================\n"
-# find . -type d -name "__pycache__" -exec rm -rf {} +
+# Cleaning the cache of the entire project
+echo "\n========================================================"
+echo "Cleaning the cache of the entire project..."
+echo "========================================================\n"
+find . -type d -name "__pycache__" -exec rm -rf {} +
 
 # Stamping the database with the base revision
 echo "\n========================================================"

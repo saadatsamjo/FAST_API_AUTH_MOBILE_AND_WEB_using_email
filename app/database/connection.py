@@ -28,7 +28,7 @@ AsyncSessionLocal = async_sessionmaker(
 # Base class for models
 Base = declarative_base()
 
-print("✅ Database Successfully Connected")
+print(f"✅ Successfully Connected to database: {settings.DB_NAME}")
 
 # Dependency to get database session
 async def get_db() -> AsyncSession:

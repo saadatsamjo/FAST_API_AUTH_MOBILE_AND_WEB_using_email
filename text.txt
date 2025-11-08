@@ -22,8 +22,10 @@ uv init
 uv venv
 source .venv/bin/activate
 uv add fastapi "uvicorn[standard]"
+uv add fastapi "uvicorn[standard]" --active
 uv run uvicorn app.main:app --reload
 uv sync
+uv sync --active
 
 
 
@@ -49,10 +51,17 @@ uv run uvicorn app.main:app --reload
 
 POSTGRESSQL
 brew services list
+brew services list | grep postgresql
 brew services start postgresql
+pg_isready (to check if postgresql is running and accepting connections)
 
 psql -U mac -d postgres; (i.e connect to postgresql using with default user, 'mac' the username of the machine)
+psql -U saadat -d postgres;
+psql -U myprojectdbuser -d postgres; (for a specific user)
+psql -U postgres (without specifying a database user, it will connect to the default database using 'postgres' user)
 
+
+ALTER ROLE myprojectdbuser CREATEDB; (to grant the user the ability to create databases if the user myprojectdbuser is supposed to be used to create databases)
 CREATE DATABASE myTestDb;
 CREATE ROLE userMe WITH LOGIN PASSWORD 'myDbPassword';
 GRANT ALL PRIVILEGES ON DATABASE myTestDb TO userMe;
@@ -61,6 +70,14 @@ GRANT ALL PRIVILEGES ON DATABASE myTestDb TO userMe;
 \du (list users)
 \c postgres (connect to postgres or any other db name)
 \dt (list tables)
+
+# GRANTING PERMISSIONS
+psql -U saadat -d mytestdb -c "GRANT ALL ON SCHEMA public TO saadat;"
+psql -U saadat -d mytestdb -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO saadat;"
+psql -U saadat -d mytestdb -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO saadat;"
+
+# OR JUST MAKE A SUPERUSER
+psql -U postgres -c "ALTER USER saadat WITH SUPERUSER;"
 
 MIGRATIONS WITH ALEMBIC
 uv add alembic
