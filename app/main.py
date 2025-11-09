@@ -1,5 +1,4 @@
 # app/main.py
-# app/main.py
 from app.user_settings.routes import router as user_settings_router
 from app.authentication.routes import router as auth_router
 from app.authentication.security import cleanup_expired_tokens
@@ -25,7 +24,8 @@ async def scheduled_token_cleanup():
 
 
 async def periodic_cleanup():
-    """Run cleanup every 24 hours."""
+    """Run cleanup every 24 hours, delay first run slightly."""
+    await asyncio.sleep(120)  # Give the DB a few seconds to settle and allow aut tables creation or migrations
     while True:
         await scheduled_token_cleanup()
         # run cleanup every 24 hours
@@ -43,11 +43,11 @@ async def lifespan(app: FastAPI):
     if settings.ENVIRONMENT == "development":
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        print("🚀 Tables auto-created (development mode)")
+        print(f"🚀 Tables auto-created ({settings.ENVIRONMENT} mode)")
 
     # Start background cleanup
     cleanup_task = asyncio.create_task(periodic_cleanup())
-    print("✅ Background token cleanup started (every 24 hours)\n")
+    print(f"✅ Background token cleanup started in {settings.ENVIRONMENT} mode")
 
     yield  # App runs here
 
