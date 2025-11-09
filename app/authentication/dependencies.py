@@ -1,5 +1,6 @@
 # app/authentication/dependencies.py
-from app.authentication.models import TokenBlacklist
+
+from app.authentication.models import BlacklistedToken, ActiveToken
 from app.authentication.security import decode_token
 from app.authentication.helpers import ClientType, get_client_type
 from fastapi import Depends, HTTPException, status, Request, Header
@@ -7,12 +8,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.connection import get_db
 from app.users.models import User
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from typing import Optional
 from app.core.config import settings
+from app.helpers.time import utcnow
 
 # Security scheme for mobile Bearer tokens
 security = HTTPBearer(auto_error=False)
+
 
 # ===========================================
 # ✅ Get Current User
@@ -20,7 +23,6 @@ security = HTTPBearer(auto_error=False)
 async def get_current_user(
     request: Request,
     client_type: ClientType = Depends(get_client_type),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
@@ -31,21 +33,23 @@ async def get_current_user(
     - Mobile clients: Token from Authorization: Bearer header
     """
     token = None
-    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     # Get token based on client type
     if client_type == ClientType.WEB:
         # Web: Get token from cookie
         token = request.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
     elif client_type == ClientType.MOBILE:
         # Mobile: Get token from Authorization header
-        if credentials:
-            token = credentials.credentials
-    
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+        else:
+            raise credentials_exception  # Mobile clients MUST provide Authorization header
 
     if not token:
         raise credentials_exception
@@ -62,13 +66,29 @@ async def get_current_user(
             detail="Invalid token type"
         )
 
+    # Check if token is still active
+    stmt = select(ActiveToken).where(
+        and_(
+            ActiveToken.token == token,
+            ActiveToken.expires_at > utcnow()
+        )
+    )
+    result = await db.execute(stmt)
+    active_token = result.scalar_one_or_none()
+    
+    if not active_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token is no longer active"
+        )
+
     # Get user email from token
     email: Optional[str] = payload.get("sub")
     if email is None:
         raise credentials_exception
 
     # Check if token is blacklisted
-    stmt = select(TokenBlacklist).where(TokenBlacklist.token == token)
+    stmt = select(BlacklistedToken).where(BlacklistedToken.token == token)
     result = await db.execute(stmt)
     blacklisted = result.scalar_one_or_none()
     if blacklisted:
@@ -128,13 +148,13 @@ async def get_current_verified_user(
     return current_user
 
 
+
 # ===========================================
-# ✅ Get Refresh Token User
+# ✅ Get Refresh Token User (CORRECTED)
 # ===========================================
 async def get_refresh_token_user(
     request: Request,
     client_type: ClientType = Depends(get_client_type),
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> tuple[User, str]:
     """
@@ -143,21 +163,23 @@ async def get_refresh_token_user(
     Supports both web (cookies) and mobile (Authorization header) clients.
     """
     token = None
-    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     # Get token based on client type
     if client_type == ClientType.WEB:
         # Web: Get token from cookie
         token = request.cookies.get(settings.REFRESH_TOKEN_COOKIE_NAME)
     elif client_type == ClientType.MOBILE:
         # Mobile: Get token from Authorization header
-        if credentials:
-            token = credentials.credentials
-    
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate refresh token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+        else:
+            raise credentials_exception
 
     if not token:
         raise credentials_exception
@@ -174,12 +196,28 @@ async def get_refresh_token_user(
             detail="Invalid token type, expected refresh token",
         )
 
+    # Check if refresh token is still active
+    stmt = select(ActiveToken).where(
+        and_(
+            ActiveToken.token == token,
+            ActiveToken.expires_at > utcnow()
+        )
+    )
+    result = await db.execute(stmt)
+    active_token = result.scalar_one_or_none()
+    
+    if not active_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is no longer active"
+        )
+
     email: Optional[str] = payload.get("sub")
     if email is None:
         raise credentials_exception
 
     # Check if token is blacklisted
-    stmt = select(TokenBlacklist).where(TokenBlacklist.token == token)
+    stmt = select(BlacklistedToken).where(BlacklistedToken.token == token)
     result = await db.execute(stmt)
     blacklisted = result.scalar_one_or_none()
     if blacklisted:

@@ -1,4 +1,5 @@
 # app/authentication/schemas.py
+
 from pydantic import BaseModel, EmailStr, Field
 from app.users.schemas import UserResponse
 from typing import Optional
@@ -14,6 +15,7 @@ class ForgotPassword(BaseModel):
     email: EmailStr
 
 class ResetPassword(BaseModel):
+    # token: str  # ADD THIS LINE 
     new_password: str = Field(..., min_length=8, max_length=100)
 
 class ChangePassword(BaseModel):

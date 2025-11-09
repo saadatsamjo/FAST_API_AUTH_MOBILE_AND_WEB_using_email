@@ -5,4 +5,4 @@
 
 from app.users.models import User
 from app.user_settings.models import Settings
-from app.authentication.models import TokenBlacklist, PasswordResetToken
+from app.authentication.models import BlacklistedToken, PasswordResetToken

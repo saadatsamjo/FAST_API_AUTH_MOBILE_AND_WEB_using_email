@@ -1,4 +1,5 @@
 # app/authentication/routes.py
+
 from fastapi import (
     HTTPException,
     APIRouter,

@@ -24,7 +24,7 @@ from app.users.models import User
 router = APIRouter()
 
 
-# # ✅ CREATE SETTINGS
+# # ✅ CREATE SETTINGS (automatically created when user registers for now)
 # @router.post("/", response_model=SettingsRead)
 # async def create_settings_route(
 #     settings_data: SettingsCreate,

@@ -1,4 +1,5 @@
 # app/authentication/helpers.py
+
 from fastapi import Header, HTTPException, status
 from app.core.config import settings
 from fastapi import Response
@@ -18,7 +19,7 @@ class ClientType(str, Enum):
     MOBILE = "mobile"
 
 
-# ✅ Get Client Type
+# ✅ Get  Type
 def get_client_type(
     x_client_type: Literal["web", "mobile"] = Header(
         default="web",

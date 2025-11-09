@@ -28,8 +28,11 @@ class User(Base):
     last_name = Column(String, nullable=True)
     
     # Relationship with token blacklist
-    blacklisted_tokens = relationship("TokenBlacklist", back_populates="user", cascade="all, delete-orphan")
+    blacklisted_tokens = relationship("BlacklistedToken", back_populates="user", cascade="all, delete-orphan")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+    # Relationship with active tokens
+    active_tokens = relationship("ActiveToken", back_populates="user", cascade="all, delete-orphan")
 
     # Relationship with settings model 
     settings = relationship("Settings", back_populates="user", uselist=False)

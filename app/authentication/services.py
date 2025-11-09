@@ -1,6 +1,6 @@
 # app/authentication/services.py
 
-from app.authentication.models import TokenBlacklist, PasswordResetToken
+from app.authentication.models import BlacklistedToken, PasswordResetToken, ActiveToken
 from app.authentication.helpers import formulate_reset_link
 from app.helpers.time import utcnow
 from app.authentication.utils import (
@@ -23,10 +23,11 @@ from app.authentication.security import (
     get_token_expiry,
     verify_password,
     decode_token,
+    blacklist_all_user_tokens,
 )
 from typing import Optional, Tuple
 from app.users.models import User
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 # Importing create_default_settings
 from app.users.services.create_default_settings import create_default_settings
@@ -73,10 +74,12 @@ async def register_user(
     await db.commit()
     await db.refresh(new_user)
 
-    # Auto authenticate and return tokens
-    access_token, refresh_token = await login_user(
-        UserLogin(email=new_user.email, password=user_data.password), db
-    )
+    # Include user_id in token data for active token tracking
+    token_data = {"sub": new_user.email, "user_id": new_user.id}
+    
+    # Create tokens with database storage
+    access_token = await create_access_token(data=token_data, db=db)
+    refresh_token = await create_refresh_token(data=token_data, db=db)
 
     # Create default settings for the new user
     await create_default_settings(new_user, db)
@@ -137,9 +140,12 @@ async def login_user(user_data: UserLogin, db: AsyncSession) -> Tuple[str, str]:
             detail="User account is inactive"
         )
 
-    # Create tokens
-    access_token = create_access_token(data={"sub": user.email})
-    refresh_token = create_refresh_token(data={"sub": user.email})
+    # Include user_id in token data for active token tracking
+    token_data = {"sub": user.email, "user_id": user.id}
+    
+    # Create tokens with database storage
+    access_token = await create_access_token(data=token_data, db=db)
+    refresh_token = await create_refresh_token(data=token_data, db=db)
 
     return access_token, refresh_token
 
@@ -166,7 +172,7 @@ async def refresh_access_token(
         )
 
     # Check if refresh token is blacklisted
-    stmt = select(TokenBlacklist).where(TokenBlacklist.token == refresh_token)
+    stmt = select(BlacklistedToken).where(BlacklistedToken.token == refresh_token)
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -185,15 +191,20 @@ async def refresh_access_token(
             detail="User not found or inactive",
         )
 
-    # Create new tokens
-    new_access_token = create_access_token(data={"sub": user.email})
-    new_refresh_token = create_refresh_token(data={"sub": user.email})
+    # Include user_id in new tokens
+    token_data = {"sub": user.email, "user_id": user.id}
+    
+    # Create new tokens with database storage
+    new_access_token = await create_access_token(data=token_data, db=db)
+    new_refresh_token = await create_refresh_token(data=token_data, db=db)
 
-    # Blacklist old refresh token
-    blacklist_entry = TokenBlacklist(
+    # Blacklist old refresh token with token_type
+    blacklist_entry = BlacklistedToken(
         token=refresh_token, 
+        token_type="refresh",  # ADD THIS
         user_id=user.id, 
-        expires_at=get_token_expiry("refresh")
+        expires_at=get_token_expiry("refresh"),
+        reason="token_refresh"
     )
     db.add(blacklist_entry)
     await db.commit()
@@ -202,14 +213,28 @@ async def refresh_access_token(
 
 
 # ============================================================
-# ✅ LOGOUT USER
+# ✅ LOGOUT USER (UPDATED)
 # ============================================================
 async def logout_user(token: str, user: User, db: AsyncSession) -> None:
     """Logout user by blacklisting the token."""
-    blacklist_entry = TokenBlacklist(
+    # Remove from active tokens and get token type
+    stmt = select(ActiveToken).where(ActiveToken.token == token)
+    result = await db.execute(stmt)
+    active_token = result.scalar_one_or_none()
+    
+    token_type = "access"  # Default to access token
+    
+    if active_token:
+        token_type = active_token.token_type
+        await db.delete(active_token)
+    
+    # Add to blacklist with token_type
+    blacklist_entry = BlacklistedToken(
         token=token, 
+        token_type=token_type,
         user_id=user.id, 
-        expires_at=get_token_expiry("access")
+        expires_at=get_token_expiry("access"),
+        reason="logout"
     )
     db.add(blacklist_entry)
     await db.commit()
@@ -300,7 +325,10 @@ async def resetting_password(
 
     user.hashed_password = get_password_hash(new_password)
     reset_token.used = True
-    db.add_all([user, reset_token])
+    
+    # Use the new blacklist function to logout from all devices
+    await blacklist_all_user_tokens(user.id, db, reason="password_reset")
+    
     await db.commit()
     await db.refresh(user)
 
@@ -319,6 +347,10 @@ async def update_password(
         )
 
     user.hashed_password = get_password_hash(new_password)
+    
+    # Use the new blacklist function to logout from all devices
+    await blacklist_all_user_tokens(user.id, db, reason="password_change")
+    
     await db.commit()
 
 
