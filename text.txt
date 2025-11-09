@@ -18,7 +18,13 @@ uv run uvicorn app.main:app --reload
 uv run alembic upgrade head && uv run uvicorn app.main:app --reload (to run migrations and start the app)
 
 # FOR PRODUCTION
+uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 0R 
+alembic upgrade head
+exec gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000 app.main:app
+(Handles restarts on crush, scale automatically. this will Run 4 worker processes (adjust based on CPU cores))
 
 
 USING UV REFINED, SHORTENED
