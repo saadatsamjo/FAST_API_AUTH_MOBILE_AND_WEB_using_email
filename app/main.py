@@ -1,5 +1,5 @@
 # app/main.py
-
+# app/main.py
 from app.user_settings.routes import router as user_settings_router
 from app.authentication.routes import router as auth_router
 from app.authentication.security import cleanup_expired_tokens
@@ -13,9 +13,8 @@ import uvicorn
 import asyncio
 
 
-# scheduling token cleanup task which will use async for loop to clean up expired tokens
 async def scheduled_token_cleanup():
-    """Background task to clean up expired tokens using async for loop"""
+    """Run one token cleanup cycle."""
     try:
         print(f"\n🔄 Starting token cleanup at {utcnow()}")
         async for db in get_db():
@@ -24,34 +23,35 @@ async def scheduled_token_cleanup():
     except Exception as e:
         print(f"❌ Token cleanup failed: {e}")
 
+
 async def periodic_cleanup():
-    """Run cleanup every 24 hours"""
+    """Run cleanup every 24 hours."""
     while True:
         await scheduled_token_cleanup()
-        # Wait 10 minutes
-        await asyncio.sleep(600)
+        # run cleanup every 24 hours
+        # await asyncio.sleep(60 * 60 * 24)
+
+        # run cleanup every 10 Seconds
+        await asyncio.sleep(10)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Handles app startup and shutdown.
-    """
-    # ✅ Startup logic
-    import app.model_registry  # ensures models are registered
+    import app.model_registry  # ensure models are registered
 
-    # Start background cleanup task using asyncio.create_task (fastapi internal scheduler)
+    # Create tables only in development
+    if settings.ENVIRONMENT == "development":
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("🚀 Tables auto-created (development mode)")
+
+    # Start background cleanup
     cleanup_task = asyncio.create_task(periodic_cleanup())
-    print("✅ Background token cleanup started (runs every 24 hours)\n")
+    print("✅ Background token cleanup started (every 24 hours)\n")
 
-    # FOR DEVELOPMENT - Uncomment to create tables on startup
-    # async with engine.begin() as conn:
-    #     await conn.run_sync(Base.metadata.create_all)
-    # print("🚀 App startup complete")
+    yield  # App runs here
 
-    yield  # Application runs here
-
-    # ✅ Shutdown logic
+    # Shutdown
     cleanup_task.cancel()
     try:
         await cleanup_task
@@ -61,23 +61,18 @@ async def lifespan(app: FastAPI):
     print("👋 App shutdown complete")
 
 
-# Initialize FastAPI with the lifespan handler
 app = FastAPI(lifespan=lifespan)
-
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],  # The specific frontend URL allowed
-    # allow_origins=[settings.FRONTEND_URL, "http://127.0.0.1:3000"]
+    allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# Routers
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(user_settings_router, prefix="/api/settings", tags=["User Settings"])
-
 
 
 if __name__ == "__main__":

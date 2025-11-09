@@ -7,7 +7,7 @@ from typing import Optional
 class Settings(BaseSettings):
     # General Settings
     APP_NAME: str = Field(default="My FastAPI App", env="APP_NAME")
-    DEV_MODE: bool = Field(default=True, env="DEV_MODE")
+    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
     DEBUG: bool = Field(default=True, env="DEBUG")
     
     # Database Settings
@@ -39,8 +39,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def adjust_for_environment(self):
-        """Automatically adjust settings based on DEV_MODE"""
-        if not self.DEV_MODE:
+        """Automatically adjust settings based on ENVIRONMENT variable from .env file"""
+        if  self.ENVIRONMENT == "production":
             # Production settings
             self.COOKIE_SECURE = True
             self.COOKIE_SAMESITE = "strict"
