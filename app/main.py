@@ -29,10 +29,10 @@ async def periodic_cleanup():
     while True:
         await scheduled_token_cleanup()
         # run cleanup every 24 hours
-        # await asyncio.sleep(60 * 60 * 24)
+        await asyncio.sleep(60 * 60 * 24)
 
-        # run cleanup every 10 Seconds
-        await asyncio.sleep(10)
+        # # run cleanup every 10 Seconds
+        # await asyncio.sleep(10)
 
 
 @asynccontextmanager
@@ -65,6 +65,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
+    # allow_origins=['*'],
     allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],

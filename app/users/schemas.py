@@ -27,6 +27,12 @@ class UserRegister(BaseModel):
     role: ROLES = "user"
     gender: GENDERS = "unset"
 
+    @field_validator("email", mode="before")
+    def normalize_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
     @field_validator("role")
     def validate_role_field(cls, v):
         if v not in ["admin", "user"]:

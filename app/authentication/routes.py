@@ -36,6 +36,7 @@ from app.authentication.helpers import (
 )
 from app.users.models import User
 from app.authentication.schemas import (
+    TokenAndUserObjectResponseAfterLoginMobile,
     TokenResponseAfterRegistrationMobile,
     TokenResponseAfterRegistrationWeb,
     TokenResponseAfterRefreshMobile,
@@ -107,7 +108,7 @@ async def register(
 # ============================================================
 @router.post(
     "/login",
-    response_model=Union[TokenResponseAfterLoginWeb, TokenResponseAfterLoginMobile],
+    response_model=Union[TokenResponseAfterLoginWeb, TokenResponseAfterLoginMobile, TokenAndUserObjectResponseAfterLoginMobile],
     status_code=status.HTTP_200_OK,
 )
 async def login(
@@ -131,16 +132,26 @@ async def login(
     - Include `Authorization: Bearer <access_token>` in subsequent requests
     - Store tokens securely in Keychain (iOS) or Keystore (Android)
     """
-    access_token, refresh_token = await login_user(user_data, db)
+    access_token, refresh_token, user = await login_user(user_data, db)
+    print(user)
 
     if client_type == ClientType.WEB:
         set_auth_cookies(response, access_token, refresh_token)
         return TokenResponseAfterLoginWeb(message="Login successful")
 
-    return TokenResponseAfterLoginMobile(
+    # # if user object is not needed in response
+    # return TokenResponseAfterLoginMobile(
+    #     message="Login successful",
+    #     access_token=access_token,
+    #     refresh_token=refresh_token,
+    # )
+    
+    # if user object is needed in the response 
+    return TokenAndUserObjectResponseAfterLoginMobile(
+        # message="Login successful",
         access_token=access_token,
         refresh_token=refresh_token,
-        message="Login successful",
+        user=user, # This is now a Pydantic UserResponse
     )
 
 

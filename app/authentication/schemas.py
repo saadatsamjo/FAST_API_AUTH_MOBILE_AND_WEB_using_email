@@ -1,6 +1,6 @@
 # app/authentication/schemas.py
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.users.schemas import UserResponse
 from typing import Optional
 
@@ -11,8 +11,20 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email", mode="before")
+    def normalize_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
 class ForgotPassword(BaseModel):
     email: EmailStr
+
+    @field_validator("email", mode="before")
+    def normalize_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
 class ResetPassword(BaseModel):
     # token: str  # ADD THIS LINE 
@@ -57,6 +69,15 @@ class TokenResponseAfterLoginMobile(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     message: str = "Login successful"
+
+
+class TokenAndUserObjectResponseAfterLoginMobile(BaseModel):
+    """Response after login for mobile clients - tokens in body for keychain/keystore"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    message: str = "Login successful"
+    user: UserResponse
 
 class TokenResponseAfterRefreshMobile(BaseModel):
     """Response after token refresh for mobile clients - tokens in body for keychain/keystore"""

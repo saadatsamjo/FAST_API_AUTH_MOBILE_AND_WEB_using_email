@@ -15,6 +15,8 @@ uv lock
 uv sync
 uv sync --locked (to sync keeping the version)
 uv run uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
 uv run alembic upgrade head && uv run uvicorn app.main:app --reload (to run migrations and start the app)
 
 # FOR PRODUCTION

@@ -51,8 +51,8 @@ async def register_user(
     user_data: UserRegister, db: AsyncSession
 ) -> RegistrationResponse:
     """Register a new user."""
-    # Check if email already exists
-    stmt = select(User).where(User.email == user_data.email)
+    # Check if email already exists (case-insensitive)
+    stmt = select(User).where(User.email == user_data.email.strip().lower())
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -63,7 +63,7 @@ async def register_user(
     # Create new user
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
-        email=user_data.email,
+        email=user_data.email.strip().lower(),
         hashed_password=hashed_password,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
@@ -110,7 +110,8 @@ async def authenticate_user(
     email: str, password: str, db: AsyncSession
 ) -> Optional[User]:
     """Authenticate a user by email and password."""
-    stmt = select(User).where(User.email == email)
+    # stmt = select(User).where(User.email == email)
+    stmt = select(User).where(User.email == email.strip().lower())
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
@@ -123,31 +124,31 @@ async def authenticate_user(
 # ============================================================
 # ✅ LOGIN USER
 # ============================================================
-async def login_user(user_data: UserLogin, db: AsyncSession) -> Tuple[str, str]:
+async def login_user(user_data: UserLogin, db: AsyncSession) -> Tuple[str, str, UserResponse]:
     """Login user and return access and refresh tokens."""
     user = await authenticate_user(user_data.email, user_data.password, db)
-
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
-
     # Include user_id in token data for active token tracking
     token_data = {"sub": user.email, "user_id": user.id}
-    
     # Create tokens with database storage
     access_token = await create_access_token(data=token_data, db=db)
     refresh_token = await create_refresh_token(data=token_data, db=db)
 
-    return access_token, refresh_token
+    # Convert SQLAlchemy User model to Pydantic UserResponse
+    user_response = UserResponse.model_validate(user)
+
+    return access_token, refresh_token, user_response
+
 
 
 # ============================================================
@@ -180,8 +181,8 @@ async def refresh_access_token(
             detail="Refresh token has been revoked",
         )
 
-    # Get user
-    stmt = select(User).where(User.email == email)
+    # Get user (case-insensitive)
+    stmt = select(User).where(User.email == email.strip().lower())
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
@@ -251,8 +252,8 @@ async def create_password_reset_link(
     Returns (reset_link, reset_token) for logging/testing purposes.
     """
     try:
-        # Check if the user exists
-        result = await db.execute(select(User).where(User.email == email))
+        # Check if the user exists (case-insensitive)
+        result = await db.execute(select(User).where(User.email == email.strip().lower()))
         user = result.scalar_one_or_none()
 
         # Always respond the same way — don't reveal if user exists
